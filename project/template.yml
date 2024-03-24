@@ -3,7 +3,7 @@ Description: Toolchain template which provides the resources needed to represent
 Parameters:
   SageMakerProjectName:
     Type: String
-    Description: Name of the project
+    Description: Truck Break
     NoEcho: true
     MinLength: 1
     MaxLength: 32
@@ -75,12 +75,12 @@ Resources:
     Properties:
       Description: To trigger the GitHub Workflow
       Handler: lambda_function.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.11
       FunctionName: !Sub sagemaker-${SageMakerProjectId}-github-trigger
       Timeout: 900
       Role: !GetAtt GitHubWorkflowTriggerLambdaExecutionRole.Arn
       Code:
-        S3Bucket: mlops-sagemaker-github-example
+        S3Bucket: martymdlregistry
         S3Key: lambda-github-workflow-trigger.zip
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:python39-github-arm64:1
