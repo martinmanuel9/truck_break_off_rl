@@ -6,6 +6,7 @@ import random
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
+from sklearn.preprocessing import OneHotEncoder
 
 
 class TruckBreakOffModel:
@@ -20,21 +21,34 @@ class TruckBreakOffModel:
 
         # define feature TRUCK_BREAK_OFF
         df['TRUCK_BREAK_OFF'] = 0
-
         # capture labels
         df['LABEL'] = 0
-
         df['LABEL'] = [random.randint(0, 1) for _ in range(len(df))]
 
         # Randomize 0s and 1s for the column TRUCK_BREAK_OFF
         df['TRUCK_BREAK_OFF'] = [random.randint(0, 1) for _ in range(len(df))]
 
-        print(df.head(5))
+         # Data preprocessing
+        df['LAST_EDITED_DATE'] = pd.to_datetime(df['LAST_EDITED_DATE'])
+        # Convert datetime to Unix timestamp
+        df['LAST_EDITED_DATE'] = df['LAST_EDITED_DATE'].astype(int)
+        df['ROUTEID'] = df['ROUTEID'].astype('category').cat.codes
 
         ## normalization 
         scaler = MinMaxScaler()
-        df[['ROUTEID','FROMMEASURE', 'TOMEASURE','OBJECTID','TRUCK_BREAK_OFF']] = scaler.fit_transform(df[['FROMMEASURE', 'TOMEASURE']])
+        df[['ROUTEID','LAST_EDITED_DATE','TRUCK_BREAK_OFF']] = scaler.fit_transform(df[['ROUTEID','LAST_EDITED_DATE','TRUCK_BREAK_OFF']])
 
+        # Data preprocessing complete
+        print('Dataset:\n', df.head(5))
+        # create train test split
+        self.train = df.sample(frac=0.8, random_state=200)
+        self.test = df.drop(self.train.index)
+
+        print('Train set:\n', self.train.head())
+        print('Test set:\n', self.test.head())
+
+
+        
         # Define the transition matrix (Markov chain)
         self.transition_matrix = np.array([[0.9, 0.1],
                                     [0.3, 0.7]])
@@ -42,7 +56,7 @@ class TruckBreakOffModel:
         # Define the reward matrix
         self.reward_matrix = np.array([[10, -1],
                                 [-1, 10]])
-
+        
 
     def reinforcement_model(self):
         # Define hyperparameters
@@ -54,56 +68,50 @@ class TruckBreakOffModel:
         # Define the Q-network
         num_states = self.transition_matrix.shape[0]
         num_actions = self.transition_matrix.shape[1]
-        num_features = 5  # Number of features in your input data
-        inputs = tf.placeholder(shape=[1, num_states], dtype=tf.float32)
-        W = tf.Variable(tf.random_uniform([num_states, num_actions], 0, 0.01))
-        Q_values = tf.matmul(inputs, W)
-        predict = tf.argmax(Q_values, 1)
+        num_features = 4  # Number of features in your input data
+        W = tf.Variable(tf.random.uniform([num_states, num_actions], 0, 0.01))
 
         # Define loss and optimizer
-        next_Q = tf.placeholder(shape=[1, num_actions], dtype=tf.float32)
-        loss = tf.reduce_sum(tf.square(next_Q - Q_values))
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss)
-
-
-        # Wrap the TensorFlow model in a Keras Sequential model
-        keras_model = Sequential()
-        keras_model.add(Dense(num_actions, input_shape=(num_features,), activation='linear', use_bias=False))
+        optimizer = tf.optimizers.SGD(learning_rate=learning_rate)
 
         # Initialize TensorFlow session
-        init = tf.global_variables_initializer()
-        with tf.Session() as sess:
-            sess.run(init)
-            for episode in range(num_episodes):
-                state = np.random.randint(0, num_states)  # Start at a random state
-                while True:
-                    # Choose action (epsilon-greedy)
-                    if np.random.rand() < epsilon:
-                        action = np.random.randint(0, num_actions)
-                    else:
-                        action = sess.run(predict, feed_dict={inputs: np.identity(num_states)[state:state+1]})
-                    # Perform action and observe next state and reward
-                    next_state = np.random.choice(range(num_states), p=self.transition_matrix[state])
-                    reward = self.reward_matrix[state, action]
-                    # Compute Q-value of next state
-                    Q_next = sess.run(Q_values, feed_dict={inputs: np.identity(num_states)[next_state:next_state+1]})
-                    # Update Q-value of current state
-                    max_Q_next = np.max(Q_next)
-                    target_Q = reward + discount_factor * max_Q_next
-                    target_Q_values = sess.run(Q_values, feed_dict={inputs: np.identity(num_states)[state:state+1]})
-                    target_Q_values[0, action] = target_Q
-                    # Train Q-network
-                    _, new_W = sess.run([optimizer, W], feed_dict={inputs: np.identity(num_states)[state:state+1], next_Q: target_Q_values})
-                    state = next_state
-                    if state == 0:  # Reached terminal state
-                        break
+        for episode in range(num_episodes):
+            state = np.random.randint(0, num_states)  # Start at a random state
+            while True:
+                # Choose action (epsilon-greedy)
+                if np.random.rand() < epsilon:
+                    action = np.random.randint(0, num_actions)
+                else:
+                    print("Shape of W:", W.shape)
+                    print(tf.one_hot(state, num_states))
+                    action = tf.argmax(tf.matmul(tf.one_hot(state, num_states), W), 1).numpy()[0]
+                # Perform action and observe next state and reward
+                next_state = np.random.choice(range(num_states), p=self.transition_matrix[state])
+                reward = self.reward_matrix[state, action]
+                # Compute Q-value of next state
+                Q_next = tf.matmul(tf.one_hot(next_state, num_states), W)
+                # Update Q-value of current state
+                max_Q_next = tf.reduce_max(Q_next)
+                target_Q_values = tf.matmul(tf.one_hot(state, num_states), W)
+                target_Q_values[0, action] = reward + discount_factor * max_Q_next
 
-            # Save the learned model
-            saver = tf.train.Saver()
-            saver.save(sess, 'model/truck_break_off_model.ckpt')
-            # Print the learned Q-values
-            print("Learned Q-values:")
-            print(sess.run(W))
+                # Train Q-network
+                with tf.GradientTape() as tape:
+                    Q_values = tf.matmul(tf.one_hot(state, num_states), W)
+                    loss = tf.reduce_sum(tf.square(target_Q_values - Q_values))
+                gradients = tape.gradient(loss, [W])
+                optimizer.apply_gradients(zip(gradients, [W]))
+                state = next_state
+                if state == 0:  # Reached terminal state
+                    break
+
+        # Save the learned model
+        tf.saved_model.save(keras_model, 'model/truck_break_off_model')
+        # Print the learned Q-values
+        print("Learned Q-values:")
+        print(W.numpy())
+
+
 
 test = TruckBreakOffModel()
 test.reinforcement_model()
