@@ -39,13 +39,13 @@ class TruckBreakOffModel:
         df[['ROUTEID','LAST_EDITED_DATE','TRUCK_BREAK_OFF']] = scaler.fit_transform(df[['ROUTEID','LAST_EDITED_DATE','TRUCK_BREAK_OFF']])
 
         # Data preprocessing complete
-        print('Dataset:\n', df.head(5))
+        # print('Dataset:\n', df.head(5))
         # create train test split
         self.train = df.sample(frac=0.8, random_state=200)
         self.test = df.drop(self.train.index)
 
-        print('Train set:\n', self.train.head())
-        print('Test set:\n', self.test.head())
+        # print('Train set:\n', self.train.head())
+        # print('Test set:\n', self.test.head())
 
 
         
@@ -82,23 +82,30 @@ class TruckBreakOffModel:
                 if np.random.rand() < epsilon:
                     action = np.random.randint(0, num_actions)
                 else:
-                    print("Shape of W:", W.shape)
-                    print(tf.one_hot(state, num_states))
-                    action = tf.argmax(tf.matmul(tf.one_hot(state, num_states), W), 1).numpy()[0]
+                    # print("Shape of W:", W.shape)
+                    # print(tf.one_hot(state, num_states))
+                    one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, -1])
+                    # print(tf.one_hot(state, num_states))
+                    action = tf.argmax(tf.matmul(one_hot_state, W), 1).numpy()[0]
                 # Perform action and observe next state and reward
                 next_state = np.random.choice(range(num_states), p=self.transition_matrix[state])
+                hot_next_state = tf.reshape(tf.one_hot(next_state, num_states), [1, -1])
                 reward = self.reward_matrix[state, action]
                 # Compute Q-value of next state
-                Q_next = tf.matmul(tf.one_hot(next_state, num_states), W)
+                Q_next = tf.matmul(hot_next_state, W)
                 # Update Q-value of current state
                 max_Q_next = tf.reduce_max(Q_next)
-                target_Q_values = tf.matmul(tf.one_hot(state, num_states), W)
-                target_Q_values[0, action] = reward + discount_factor * max_Q_next
+                target_Q_values = tf.matmul(hot_next_state, W)
+                
+                # Update Q-value of current state
+                target_Q_values_updated = tf.identity(target_Q_values)  # Create a copy
+                target_Q_values_updated = tf.tensor_scatter_nd_update(target_Q_values_updated, [[0, action]], [reward + discount_factor * max_Q_next])
 
                 # Train Q-network
                 with tf.GradientTape() as tape:
-                    Q_values = tf.matmul(tf.one_hot(state, num_states), W)
-                    loss = tf.reduce_sum(tf.square(target_Q_values - Q_values))
+                    Q_values = tf.matmul(one_hot_state, W)
+                    loss = tf.reduce_sum(tf.square(target_Q_values_updated - Q_values))
+
                 gradients = tape.gradient(loss, [W])
                 optimizer.apply_gradients(zip(gradients, [W]))
                 state = next_state
@@ -106,7 +113,7 @@ class TruckBreakOffModel:
                     break
 
         # Save the learned model
-        tf.saved_model.save(keras_model, 'model/truck_break_off_model')
+        tf.saved_model.save(W, '../model/truck_break_off_model')
         # Print the learned Q-values
         print("Learned Q-values:")
         print(W.numpy())
