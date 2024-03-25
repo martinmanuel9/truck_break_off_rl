@@ -15,3 +15,5 @@ serve as an example and point of departure to enable MLOps in your organization.
 - AWS Cloud formation
   - Established templates to orchestrate environments and layers within AWS (yml files)
     - Includes all AWS services (Lambda Layers, Github repo connections, secrets)
+
+## MLOps Recommendations

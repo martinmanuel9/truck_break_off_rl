@@ -15,3 +15,5 @@ df['TRUCK_BREAK_OFF'] = 0
 
 # Randomize 0s and 1s for the column TRUCK_BREAK_OFF
 df['TRUCK_BREAK_OFF'] = [random.randint(0, 1) for _ in range(len(df))]
+
+print(df.head(5))
