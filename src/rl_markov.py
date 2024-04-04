@@ -33,14 +33,19 @@ class TruckBreakOffModel:
 
         # Data preprocessing
         df['LAST_EDITED_DATE'] = pd.to_datetime(df['LAST_EDITED_DATE'])
+        df['FROMDATE'] = pd.to_datetime(df['FROMDATE'])
+        df['TODATE'] = pd.to_datetime(df['TODATE'])
         # Convert datetime to Unix timestamp
         df['LAST_EDITED_DATE'] = df['LAST_EDITED_DATE'].astype(int)
+        df['FROMDATE'] = df['FROMDATE'].astype(int)
+        df['TODATE'] = df['TODATE'].astype(int)
+        df['FROMMEASURE'] = df['FROMMEASURE'].astype(int)
+        df['TOMEASURE'] = df['TOMEASURE'].astype(int)
         df['ROUTEID'] = df['ROUTEID'].astype('category').cat.codes
-
         ## normalization
         scaler = MinMaxScaler()
-        df[['ROUTEID', 'LAST_EDITED_DATE', 'TRUCK_BREAK_OFF']] = scaler.fit_transform(
-            df[['ROUTEID', 'LAST_EDITED_DATE', 'TRUCK_BREAK_OFF']])
+        df[['ROUTEID', 'LAST_EDITED_DATE', 'TRUCK_BREAK_OFF', 'FROMDATE', 'TODATE', 'FROMMEASURE', 'TOMEASURE']] = scaler.fit_transform(
+            df[['ROUTEID', 'LAST_EDITED_DATE', 'TRUCK_BREAK_OFF', 'FROMDATE', 'TODATE', 'FROMMEASURE', 'TOMEASURE']])
 
         # Data preprocessing complete
         print('Dataset:\n', df.head(5))
@@ -50,6 +55,8 @@ class TruckBreakOffModel:
         print('Train set:\n', self.train.head())
         print('Test set:\n', self.test.head())
 
+        self.features = ['ROUTEID', 'LAST_EDITED_DATE', 'FROMDATE', 'TODATE', 'FROMMEASURE', 'TOMEASURE']
+        self.target = 'TRUCK_BREAK_OFF'
 
 
         # Define the transition matrix (Markov chain)
@@ -70,7 +77,7 @@ class TruckBreakOffModel:
         # Define the Q-network
         num_states = self.transition_matrix.shape[0]
         num_actions = self.transition_matrix.shape[1]
-        num_features = 4  # Number of features in your input data
+        num_features = 7  # Number of features in your input data
         W = tf.Variable(tf.random.uniform([num_states, num_actions], 0, 0.01))
 
         # Define loss and optimizer
@@ -111,6 +118,8 @@ class TruckBreakOffModel:
                 state = next_state
                 if state == 0:  # Reached terminal state
                     break
+        # Save the learned model
+        tf.saved_model.save(W, '../model/truck_break_off_model')
 
         # Print the learned Q-values
         print("Learned Q-values:")
@@ -121,10 +130,10 @@ class TruckBreakOffModel:
         # Evaluate the model on the test set
         num_states = self.transition_matrix.shape[0]
         num_actions = self.transition_matrix.shape[1]
-        num_features = 4  # Number of features in your input data
+        num_features = 7  # Number of features in your input data
         correct_predictions = 0
         for index, row in self.test.iterrows():
-            state = int(row['ROUTEID'])  # Convert state to integer
+            state = int(row['TRUCK_BREAK_OFF'])  # Convert state to integer
             one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, -1])
             action = tf.argmax(tf.matmul(one_hot_state, model), 1).numpy()[0]
             # Assuming action 0 corresponds to no truck break off, action 1 corresponds to truck break off
@@ -147,9 +156,9 @@ class TruckBreakOffModel:
             predicted_break_off = action
             y_pred.append(predicted_break_off)
         accuracy = accuracy_score(y_true, y_pred)
-        report = classification_report(y_true, y_pred)
+        report = classification_report(y_true, y_pred, zero_division=1)  # Set zero_division parameter
         confusion = confusion_matrix(y_true, y_pred)
-        precision = precision_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, zero_division=1)  # Set zero_division parameter
         recall = recall_score(y_true, y_pred)
         f1 = f1_score(y_true, y_pred)
         print("Accuracy:", accuracy)
