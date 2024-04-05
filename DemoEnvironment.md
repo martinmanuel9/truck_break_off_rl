@@ -9,7 +9,7 @@ aws configure
 5. Within and or directory (VS Code or IDE) run terminal 
 6. Create a new python environment 
 ```bash
-conda create -p myenv python=3.11
+conda create -p myenv python=3.8
 ```
 7. Activate envrionment
 ```bash
@@ -23,8 +23,6 @@ pandas
 numpy
 tensorflow
 ipykernel
-random
-sklearn
 ```
 9. Run the following installation within 'myenv'
 ```bash

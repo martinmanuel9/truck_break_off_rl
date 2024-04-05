@@ -79,6 +79,7 @@ class TruckBreakOffModel:
         num_actions = self.transition_matrix.shape[1]
         num_features = 7  # Number of features in your input data
         W = tf.Variable(tf.random.uniform([num_states, num_actions], 0, 0.01))
+        W = tf.transpose(W)
 
         # Define loss and optimizer
         optimizer = tf.optimizers.SGD(learning_rate=learning_rate)
@@ -86,13 +87,20 @@ class TruckBreakOffModel:
         # Initialize TensorFlow session
         for episode in range(num_episodes):
             state = np.random.randint(0, num_states)  # Start at a random state
+            one_hot_state = 0.0 
             while True:
                 # Choose action (epsilon-greedy)
                 if np.random.rand() < epsilon:
                     action = np.random.randint(0, num_actions)
                 else:
-                    one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, -1])
+                    # one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, -1])
+                    one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, num_states])
+                    print(one_hot_state.shape)
+                    print(W.shape)
+                    
+                    # Perform matrix multiplication
                     action = tf.argmax(tf.matmul(one_hot_state, W), 1).numpy()[0]
+
                 # Perform action and observe next state and reward
                 next_state = np.random.choice(range(num_states), p=self.transition_matrix[state])
                 hot_next_state = tf.reshape(tf.one_hot(next_state, num_states), [1, -1])
@@ -120,6 +128,7 @@ class TruckBreakOffModel:
                     break
         # Save the learned model
         tf.saved_model.save(W, '../model/truck_break_off_model')
+        # tf.saved_model.save(W, os.path.join('/opt/ml/model', 'truck_break_off_model'))
 
         # Print the learned Q-values
         print("Learned Q-values:")
@@ -149,7 +158,7 @@ class TruckBreakOffModel:
         y_true = self.test['LABEL']
         y_pred = []
         for index, row in self.test.iterrows():
-            state = int(row['ROUTEID'])  # Convert state to integer
+            state = int(row['TRUCK_BREAK_OFF'])  # Convert state to integer
             one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, -1])
             action = tf.argmax(tf.matmul(one_hot_state, model), 1).numpy()[0]
             # Assuming action 0 corresponds to no truck break off, action 1 corresponds to truck break off
