@@ -28,5 +28,9 @@ ipykernel
 ```bash
 pip install -r requirements.txt
 ```
-10. In AWS create an S3 Bucket
-11. 
+10. In AWS create an S3 Bucket for model registry and datasets
+11. Create folder for datasets
+12. Create folder for model registry
+13. Run DataOps.ipynb to develop synthetic data and load to S3 bucket
+14. Run ModelOps.ipynb to develop model ops, train model, evaluate model, and load to S3 bucket
+15. 
