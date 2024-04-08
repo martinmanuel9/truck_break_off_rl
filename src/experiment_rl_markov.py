@@ -137,45 +137,36 @@ class TruckBreakOffModel:
 
     def evaluate_model(self, model):
         # Evaluate the model on the test set
-        num_states = self.transition_matrix.shape[0]
-        num_actions = self.transition_matrix.shape[1]
-        num_features = 7  # Number of features in your input data
-        correct_predictions = 0
-        for index, row in self.test.iterrows():
-            state = int(row['TRUCK_BREAK_OFF'])  # Convert state to integer
-            one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, -1])
-            action = tf.argmax(tf.matmul(one_hot_state, model), 1).numpy()[0]
-            # Assuming action 0 corresponds to no truck break off, action 1 corresponds to truck break off
-            predicted_break_off = action
-            true_break_off = row['LABEL']
-            if predicted_break_off == true_break_off:
-                correct_predictions += 1
-
-        manual_calc_accuracy = correct_predictions / len(self.test)
-        print("Manual calculation accuracy:", manual_calc_accuracy)
-
-        # Evaluate the model using sklearn metrics
+        X_test = self.test[self.features].values
         y_true = self.test['LABEL']
-        y_pred = []
+        y_pred = model.predict(X_test)
+
+        # Integrate Markov chain logic for prediction correction
+        corrected_predictions = []
         for index, row in self.test.iterrows():
-            state = int(row['TRUCK_BREAK_OFF'])  # Convert state to integer
-            one_hot_state = tf.reshape(tf.one_hot(state, num_states), [1, -1])
-            action = tf.argmax(tf.matmul(one_hot_state, model), 1).numpy()[0]
-            # Assuming action 0 corresponds to no truck break off, action 1 corresponds to truck break off
-            predicted_break_off = action
-            y_pred.append(predicted_break_off)
-        accuracy = accuracy_score(y_true, y_pred)
-        report = classification_report(y_true, y_pred, zero_division=1)  # Set zero_division parameter
-        confusion = confusion_matrix(y_true, y_pred)
-        precision = precision_score(y_true, y_pred, zero_division=1)  # Set zero_division parameter
-        recall = recall_score(y_true, y_pred)
-        f1 = f1_score(y_true, y_pred)
-        print("Accuracy:", accuracy)
-        print("Classification Report:\n", report)
-        print("Confusion Matrix:\n", confusion)
-        print("Precision:", precision)
-        print("Recall:", recall)
-        print("F1 Score:", f1)
+            state = int(row['TRUCK_BREAK_OFF'])
+            action = self.markov_chain(state)
+            corrected_predictions.append(action)
+
+        corrected_accuracy = accuracy_score(y_true, corrected_predictions)
+        print("Corrected Accuracy (incorporating Markov Chain):", corrected_accuracy)
+
+        # Calculate other metrics
+        corrected_report = classification_report(y_true, corrected_predictions, zero_division=1)
+        corrected_confusion = confusion_matrix(y_true, corrected_predictions)
+        corrected_precision = precision_score(y_true, corrected_predictions, zero_division=1)
+        corrected_recall = recall_score(y_true, corrected_predictions)
+        corrected_f1 = f1_score(y_true, corrected_predictions)
+
+        print("Classification Report (incorporating Markov Chain):\n", corrected_report)
+        print("Confusion Matrix (incorporating Markov Chain):\n", corrected_confusion)
+        print("Precision (incorporating Markov Chain):", corrected_precision)
+        print("Recall (incorporating Markov Chain):", corrected_recall)
+        print("F1 Score (incorporating Markov Chain):", corrected_f1)
+
+    def markov_chain(self, state):
+        next_state = np.random.choice([0, 1], p=self.transition_matrix[state])
+        return next_state
 
 
 test = TruckBreakOffModel()
